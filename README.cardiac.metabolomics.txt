@@ -9,6 +9,52 @@ This project analyzes metabolomic profiles from three groups:
 - **T2D**: Type 2 Diabetes (formerly DM2)
 - **Control**: Control samples
 
+## Data Source
+
+This pipeline analyzes data from the **Biocrates MxP Quant 500 kit**, a targeted metabolomics platform. Raw data is processed through the **MetIDQ™ (WebIDQ) software** provided by Biocrates.
+
+### WebIDQ Platform Features
+
+The WebIDQ platform allows users to:
+- Apply quality control filters (e.g., 75% sample presence threshold)
+- Select normalization methods (Median QC, internal standards, etc.)
+- Choose concentration units (µM, log2-transformed, etc.)
+- Export data with or without quality flags (< LOD, < LLOQ, > ULOQ)
+- Generate multiple dataset versions with different filtering criteria
+
+**For this analysis**, two exports were created from WebIDQ:
+
+1. **Dataset1_µM.xlsx** (Analysis-ready)
+   - Filtered: 75% sample presence threshold applied
+   - Transformed: log2(µM) scale
+   - Cleaned: LOD/ULOQ values pre-imputed
+   - Export setting: "Concentration [log2(µM)] | Target Normalization [Median QC Level 2]"
+   - Result: 463 metabolites retained
+
+2. **Dataset2_µM.xlsx** (Quality reference)
+   - Unfiltered: All detected metabolites included
+   - Original scale: µM (not log-transformed)
+   - Uncleaned: Contains quality flag text ("< LOD", "< LLOQ", "> ULOQ")
+   - Export setting: "Concentration [µM] | Target Normalization [Median QC Level 2]"
+   - Result: 628 total metabolites
+
+### Creating Your Own Datasets
+
+To replicate this analysis with your own data:
+
+1. **Process samples** using Biocrates MxP Quant 500 kit
+2. **Upload to WebIDQ** and complete quality control
+3. **Export Dataset1** (for analysis):
+   - Apply 75% presence filter
+   - Select log2 transformation
+   - Enable imputation for < LOD and > ULOQ values
+   - Choose your normalization method
+4. **Export Dataset2** (optional, for quality stats):
+   - Remove all filters
+   - Keep original µM scale
+   - Include quality flag annotations
+
+**Note**: The specific filtering and export options available in WebIDQ may vary depending on your platform version and license. Consult the [Biocrates documentation](https://biocrates.com) or your WebIDQ manual for details on available export configurations.
 ## Repository Structure
 
 ```
@@ -151,17 +197,15 @@ The code recodes "DM2" to "T2D" for consistency. Original data may use either no
 
 ## Citation
 
-If you use this code, please cite:
+If you use this code, please cite contact oscar.puntervold@sund.ku.dk for citation details as the original paper related to this work has not been submitted.
 
-[Your paper citation here]
+
 
 ## Contact
 
-[Your name and email]
-
-## License
-
-[Choose appropriate license - MIT, GPL, etc.]
+Oscar Emil Puntervold
+oscar.puntervold@sund.ku.dk  
+djyoloprolo@gmail,com
 
 ## Troubleshooting
 
@@ -196,5 +240,6 @@ writeLines(capture.output(sessionInfo()), "output/session_info.txt")
 ## Acknowledgments
 
 Analysis pipeline developed for cardiac metabolomics study using Biocrates MxP Quant 500 kit.
+
 
 Last updated: October 2025
