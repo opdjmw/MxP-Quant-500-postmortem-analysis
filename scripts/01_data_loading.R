@@ -1,6 +1,17 @@
 # =============================================================================
 # 01_data_loading.R
 # Central data loading and preprocessing function for metabolomics analysis
+#
+# DATASET INFORMATION:
+# This script loads Dataset1_µM.xlsx, which contains:
+#   - 463 retained metabolites (≥75% sample presence)
+#   - Log2-transformed concentrations: log2(µM)
+#   - Pre-imputed values: 46 < LOD, 18 > ULOQ
+#   - Target normalization: Median QC Level 2
+#
+# Dataset2_µM.xlsx (optional, used only by script 08):
+#   - 628 total metabolites (original scale, µM)
+#   - Contains quality flags: "< LOD", "< LLOQ", "> ULOQ"
 # =============================================================================
 
 library(readxl)
@@ -116,4 +127,5 @@ load_metabolomics_data <- function(file_path = "data/Dataset1_µM.xlsx",
   message("=== Data loading complete ===\n")
   
   return(result)
+
 }
