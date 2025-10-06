@@ -1,9 +1,20 @@
 # =============================================================================
 # 08_data_quality.R
 # Data quality assessment: LOD/LLOQ/ULOQ statistics and retention analysis
-# Requires Dataset2_µM.xlsx for full analysis
+#
+# REQUIRES BOTH DATASETS:
+#   Dataset1_µM.xlsx (463 metabolites, log2-transformed, cleaned)
+#     - Used for concentration statistics of retained metabolites
+#     - Already pre-processed: LOD/ULOQ imputed, 75% threshold applied
+#   
+#   Dataset2_µM.xlsx (628 metabolites, original µM scale, uncleaned)
+#     - Used for detection limit statistics (LOD/LLOQ/ULOQ counts)
+#     - Contains text quality flags: "< LOD", "< LLOQ", "> ULOQ"
+#     - Includes all metabolites before 75% threshold filtering
+#
+# This script compares retained vs. excluded metabolites and provides
+# comprehensive quality metrics combining both datasets.
 # =============================================================================
-
 library(tidyverse)
 library(readxl)
 library(flextable)
@@ -272,4 +283,5 @@ cat("  - Classes with ≥8 metabolites:", nrow(summary_table), "\n")
 cat("\nTables created:\n")
 cat("  - data_quality_summary (CSV + Word)\n")
 cat("  - metabolite_detailed_statistics (CSV)\n")
+
 
