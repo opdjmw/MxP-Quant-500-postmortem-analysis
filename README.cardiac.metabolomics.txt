@@ -31,12 +31,16 @@ The WebIDQ platform allows users to:
    - Export setting: "Concentration [log2(µM)] | Target Normalization [Median QC Level 2]"
    - Result: 463 metabolites retained
 
-2. **Dataset2_µM.xlsx** (Quality reference)
-   - Unfiltered: All detected metabolites included
-   - Original scale: µM (not log-transformed)
-   - Uncleaned: Contains quality flag text ("< LOD", "< LLOQ", "> ULOQ")
-   - Export setting: "Concentration [µM] | Target Normalization [Median QC Level 2]"
-   - Result: 628 total metabolites
+2. **Dataset2_µM_flagged.xlsx** (Full Dataset - OPTIONAL)
+- **628 total metabolites** (before 75% threshold filtering)
+- **Original scale concentrations**: `µM` (not log-transformed)
+- **WebIDQ configuration**: Quality thresholds flagged as **text values**
+  - Values below LOD replaced with text: "< LOD" or "< threshold"
+  - Values below LLOQ replaced with text: "< LLOQ"
+  - Values above ULOQ replaced with text: "> ULOQ"
+- **Used for**: Detection limit statistics and retention analysis (script 08 only)
+
+**Important**: In Dataset2, threshold violations are not numeric values but literal text strings inserted by WebIDQ. This allows precise counting of quality flag occurrences while preserving the data structure.
 
 ### Creating Your Own Datasets
 
@@ -243,3 +247,4 @@ Analysis pipeline developed for cardiac metabolomics study using Biocrates MxP Q
 
 
 Last updated: October 2025
+
