@@ -5,20 +5,20 @@
 # REQUIRES BOTH DATASETS:
 #   Dataset1_µM.xlsx (463 metabolites, log2-transformed, cleaned)
 #     - Used for concentration statistics of retained metabolites
-#     - Already pre-processed: LOD/ULOQ imputed, 75% threshold applied
 #   
-#   Dataset2_µM.xlsx (628 metabolites, original µM scale, uncleaned)
-#     - Used for detection limit statistics (LOD/LLOQ/ULOQ counts)
-#     - Contains text quality flags: "< LOD", "< LLOQ", "> ULOQ"
-#     - Includes all metabolites before 75% threshold filtering
-#
-# This script compares retained vs. excluded metabolites and provides
-# comprehensive quality metrics combining both datasets.
+#   Dataset2_µM.xlsx (628 metabolites, original µM scale with TEXT FLAGS)
+#     - WebIDQ configured to replace threshold values with text flags
+#     - Flags: "< LOD", "< threshold", "< LLOQ", "> ULOQ"
+#     - Used for detection limit statistics
 # =============================================================================
+
 library(tidyverse)
 library(readxl)
 library(flextable)
 library(officer)
+
+# Avoid MASS::select conflict
+select <- dplyr::select
 
 # Check if Dataset2 exists
 if (!file.exists("data/Dataset2_µM.xlsx")) {
@@ -37,25 +37,20 @@ source("scripts/01_data_loading.R")
 data1 <- load_metabolomics_data("data/Dataset1_µM.xlsx")
 
 # =============================================================================
-# LOAD DATASET2 (FULL DATASET)
+# LOAD DATASET2 (FULL DATASET WITH TEXT FLAGS)
 # =============================================================================
 
-message("\n=== Loading Dataset2 (full dataset) ===")
+message("\n=== Loading Dataset2 (full dataset with quality flags) ===")
 
-dataset2 <- read_excel("data/Dataset2_µM.xlsx", skip = 1)
+# Load Dataset1 first to get structure
+dataset1_raw <- read_excel("data/Dataset1_µM.xlsx", skip = 1)[, 1:485]
 
-# Determine the last metabolite column (manually read the last metabolite column in the dataset)
-last_col <- ncol(dataset2)
-while(last_col > 23 && !is.numeric(suppressWarnings(as.numeric(dataset2[32, 650])))) {
-  last_col <- last_col - 1
-}
-
-dataset2 <- dataset2[, 1: 650]
-message("  - Dataset2 has ", 650 - 22, " total metabolites")
+# Load Dataset2 - keep as much as possible
+dataset2_raw <- read_excel("data/Dataset2_µM.xlsx", skip = 1)[, 1:650]
 
 # Extract all metabolite info from Dataset2
-all_metabolite_names <- colnames(dataset2[, 23:650])
-all_metabolite_classes <- as.character(unlist(dataset2[1, 23:650]))
+all_metabolite_names <- colnames(dataset2_raw[, 23:650])
+all_metabolite_classes <- as.character(unlist(dataset2_raw[1, 23:650]))
 all_metabolite_classes[is.na(all_metabolite_classes) | all_metabolite_classes == ""] <- "Other Information"
 
 all_metabolite_info <- data.frame(
@@ -63,6 +58,65 @@ all_metabolite_info <- data.frame(
   Class = all_metabolite_classes,
   stringsAsFactors = FALSE
 )
+
+message("  - Dataset2 has ", length(all_metabolite_names), " total metabolites")
+
+# =============================================================================
+# EXTRACT LOD/LLOQ/ULOQ STATISTICS FROM DATASET2 TEXT FLAGS
+# =============================================================================
+
+message("\n=== Extracting LOD/LLOQ/ULOQ statistics from text flags ===")
+
+# Get sample rows AS TEXT (rows 32-71, do NOT convert to numeric)
+dataset2_samples_text <- dataset2_raw[32:71, 23:650]
+n_samples <- nrow(dataset2_samples_text)
+
+# Define threshold text patterns (from WebIDQ flags)
+lod_patterns <- c("< LOD", "< threshold")
+lloq_patterns <- c("< LLOQ")
+uloq_patterns <- c("> ULOQ")
+
+# Count flags for all metabolites
+lod_lloq_uloq <- data.frame()
+
+message("  - Counting quality flags across ", length(all_metabolite_names), " metabolites...")
+
+for (met in all_metabolite_names) {
+  if (met %in% colnames(dataset2_samples_text)) {
+    # Keep as character to preserve text flags
+    values <- as.character(dataset2_samples_text[[met]])
+    
+    # Count each flag type
+    lod_count <- sum(values %in% lod_patterns, na.rm = TRUE)
+    lloq_count <- sum(values %in% lloq_patterns, na.rm = TRUE)
+    uloq_count <- sum(values %in% uloq_patterns, na.rm = TRUE)
+    
+    lod_lloq_uloq <- rbind(
+      lod_lloq_uloq,
+      data.frame(
+        Metabolite = met,
+        Values_Below_LOD = lod_count,
+        Values_Below_LLOQ = lloq_count,
+        Values_Above_ULOQ = uloq_count,
+        Percent_LOD = round(100 * lod_count / n_samples, 1),
+        Percent_LLOQ = round(100 * lloq_count / n_samples, 1),
+        Percent_ULOQ = round(100 * uloq_count / n_samples, 1),
+        stringsAsFactors = FALSE
+      )
+    )
+  }
+}
+
+# Add class information
+lod_lloq_uloq <- lod_lloq_uloq %>%
+  left_join(all_metabolite_info, by = "Metabolite")
+
+message("  - Found quality flags in ", 
+        sum(lod_lloq_uloq$Values_Below_LOD > 0), " metabolites (< LOD)")
+message("  - Found quality flags in ", 
+        sum(lod_lloq_uloq$Values_Below_LLOQ > 0), " metabolites (< LLOQ)")
+message("  - Found quality flags in ", 
+        sum(lod_lloq_uloq$Values_Above_ULOQ > 0), " metabolites (> ULOQ)")
 
 # =============================================================================
 # COMPARE RETAINED VS EXCLUDED METABOLITES
@@ -90,55 +144,10 @@ retention_by_class <- all_metabolite_info %>%
   arrange(desc(Total))
 
 # =============================================================================
-# EXTRACT LOD/LLOQ/ULOQ STATISTICS FROM DATASET2
-# =============================================================================
-
-message("\n=== Extracting LOD/LLOQ/ULOQ statistics ===")
-
-# Get text values from sample rows (typically 32-71)
-dataset2_samples <- dataset2[32:71, ]
-n_samples <- nrow(dataset2_samples)
-
-# Define threshold labels
-lod_patterns <- c("< LOD", "< threshold", "<LOD")
-lloq_patterns <- c("< LLOQ", "<LLOQ")
-uloq_patterns <- c("> ULOQ", ">ULOQ")
-
-# Count for all metabolites
-lod_lloq_uloq <- data.frame()
-
-for (met in all_metabolite_names) {
-  if (met %in% colnames(dataset2_samples)) {
-    values <- as.character(dataset2_samples[[met]])
-    
-    lod_count <- sum(values %in% lod_patterns, na.rm = TRUE)
-    lloq_count <- sum(values %in% lloq_patterns, na.rm = TRUE)
-    uloq_count <- sum(values %in% uloq_patterns, na.rm = TRUE)
-    
-    lod_lloq_uloq <- rbind(
-      lod_lloq_uloq,
-      data.frame(
-        Metabolite = met,
-        Below_LOD = lod_count,
-        Below_LLOQ = lloq_count,
-        Above_ULOQ = uloq_count,
-        Percent_LOD = round(100 * lod_count / n_samples, 1),
-        Percent_LLOQ = round(100 * lloq_count / n_samples, 1),
-        Percent_ULOQ = round(100 * uloq_count / n_samples, 1)
-      )
-    )
-  }
-}
-
-# Add class information
-lod_lloq_uloq <- lod_lloq_uloq %>%
-  left_join(all_metabolite_info, by = "Metabolite")
-
-# =============================================================================
 # GET CONCENTRATION STATISTICS FOR RETAINED METABOLITES
 # =============================================================================
 
-message("\n=== Calculating concentration statistics ===")
+message("\n=== Calculating concentration statistics for retained metabolites ===")
 
 # Back-transform from log2 to µM
 concentration_stats <- data1$long_data %>%
@@ -154,7 +163,7 @@ concentration_stats <- data1$long_data %>%
   )
 
 # =============================================================================
-# CREATE COMPREHENSIVE SUMMARY TABLE (TABLE 2 STYLE)
+# CREATE COMPREHENSIVE SUMMARY TABLE
 # =============================================================================
 
 message("\n=== Creating comprehensive summary table ===")
@@ -164,10 +173,10 @@ classes_to_include <- retention_by_class %>%
   filter(Total >= 8) %>%
   pull(Class)
 
-# Aggregate by class - use dplyr:: prefix to avoid MASS conflict
+# Aggregate by class
 summary_table <- retention_by_class %>%
   filter(Class %in% classes_to_include) %>%
-  dplyr::select(Class, Total, Retained, Retention_Percent)
+  select(Class, Total, Retained, Retention_Percent)
 
 # Add concentration stats (only for retained metabolites in these classes)
 conc_by_class <- concentration_stats %>%
@@ -211,7 +220,7 @@ summary_table <- summary_table %>%
 
 # Reorder columns
 summary_table <- summary_table %>%
-  dplyr::select(
+  select(
     Class,
     Total,
     Retained,
@@ -222,6 +231,7 @@ summary_table <- summary_table %>%
     `% < LLOQ` = Mean_LLOQ,
     `% > ULOQ` = Mean_ULOQ
   )
+
 # =============================================================================
 # EXPORT RESULTS
 # =============================================================================
@@ -253,7 +263,7 @@ ft_summary <- flextable(summary_table) %>%
 # Export to Word
 doc <- read_docx() %>%
   body_add_par("Data Quality Assessment", style = "heading 1") %>%
-  body_add_par("Summary of metabolite retention, concentration statistics, and detection limit information for classes with ≥8 total metabolites.", 
+  body_add_par("Summary of metabolite retention, concentration statistics, and detection limit information for classes with ≥8 total metabolites. Detection limit percentages based on WebIDQ text flags in Dataset2.", 
                style = "Normal") %>%
   body_add_flextable(ft_summary)
 
@@ -262,7 +272,8 @@ message("Saved: output/tables/data_quality_summary.docx")
 
 # Save detailed per-metabolite statistics (for retained metabolites only)
 detailed_stats <- concentration_stats %>%
-  left_join(lod_lloq_uloq[, c("Metabolite", "Below_LOD", "Below_LLOQ", "Above_ULOQ")], 
+  left_join(lod_lloq_uloq %>% 
+              select(Metabolite, Values_Below_LOD, Values_Below_LLOQ, Values_Above_ULOQ), 
             by = "Metabolite") %>%
   arrange(Class, Metabolite) %>%
   mutate(across(c(Mean_uM, SD_uM, Median_uM, Min_uM, Max_uM), ~ round(., 3)))
@@ -283,5 +294,3 @@ cat("  - Classes with ≥8 metabolites:", nrow(summary_table), "\n")
 cat("\nTables created:\n")
 cat("  - data_quality_summary (CSV + Word)\n")
 cat("  - metabolite_detailed_statistics (CSV)\n")
-
-
