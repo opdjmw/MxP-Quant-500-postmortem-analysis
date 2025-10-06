@@ -105,13 +105,29 @@ tryCatch({
 # STEP 7: SUPPLEMENTARY MATERIALS
 # =============================================================================
 
-cat("[Step 7/7] Generating supplementary tables...\n")
+cat("[Step 7/8] Generating supplementary tables...\n")
 tryCatch({
   source("scripts/07_supplementary.R")
   cat("\n✓ Supplementary materials complete\n\n")
 }, error = function(e) {
   cat("\n✗ Error in supplementary materials:", e$message, "\n\n")
 })
+
+# =============================================================================
+# STEP 8: DATA QUALITY ASSESSMENT (OPTIONAL - REQUIRES DATASET2)
+# =============================================================================
+
+cat("[Step 8/8] Running data quality assessment...\n")
+if (file.exists("data/Dataset2_µM.xlsx")) {
+  tryCatch({
+    source("scripts/08_data_quality.R")
+    cat("\n✓ Data quality assessment complete\n\n")
+  }, error = function(e) {
+    cat("\n✗ Error in data quality assessment:", e$message, "\n\n")
+  })
+} else {
+  cat("  - Dataset2_µM.xlsx not found - skipping (optional)\n\n")
+}
 
 # =============================================================================
 # COMPLETION AND SESSION INFO
